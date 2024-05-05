@@ -474,6 +474,23 @@ func (db *RedisDB) HGet(k, f string) string {
 	return h[f]
 }
 
+// HGetAll returns entire map associated with a key
+// Returns empty map if no key matches
+func (m *Miniredis) HGetAll(k string) map[string]string {
+	return m.DB(m.selectedDB).HGetAll(k)
+}
+
+func (db *RedisDB) HGetAll(k string) map[string]string {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	h, ok := db.hashKeys[k]
+	if !ok {
+		return map[string]string{}
+	}
+	return h
+}
+
 // HSet sets hash keys.
 // If there is another key by the same name it will be gone.
 func (m *Miniredis) HSet(k string, fv ...string) {
