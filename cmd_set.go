@@ -50,7 +50,7 @@ func (m *Miniredis) cmdSadd(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if db.exists(key) && db.t(key) != "set" {
+		if db.exists(key) && db.t(key) != keyTypeSet {
 			c.WriteError(ErrWrongType.Error())
 			return
 		}
@@ -582,6 +582,10 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
+			if withCount {
+				c.WriteLen(0)
+				return
+			}
 			c.WriteNull()
 			return
 		}

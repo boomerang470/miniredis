@@ -50,6 +50,11 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		maxlen := -1
 		minID := ""
+		makeStream := true
+		if strings.ToLower(args[0]) == "nomkstream" {
+			args = args[1:]
+			makeStream = false
+		}
 		if strings.ToLower(args[0]) == "maxlen" {
 			args = args[1:]
 			// we don't treat "~" special
@@ -101,7 +106,10 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		if s == nil {
-			// TODO: NOMKSTREAM
+			if !makeStream {
+				c.WriteNull()
+				return
+			}
 			s, _ = db.newStream(key)
 		}
 
@@ -244,7 +252,7 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 				return
 			}
 
-			if db.t(opts.key) != "stream" {
+			if db.t(opts.key) != keyTypeStream {
 				c.WriteError(ErrWrongType.Error())
 				return
 			}
@@ -1266,7 +1274,7 @@ func writeXpending(
 	consumer *string,
 ) {
 	if len(g.pending) == 0 || count < 0 {
-		c.WriteLen(-1)
+		c.WriteLen(0)
 		return
 	}
 
@@ -1304,10 +1312,6 @@ func writeXpending(
 				count:    p.deliveryCount,
 			})
 		}
-	}
-	if len(res) == 0 {
-		c.WriteLen(-1)
-		return
 	}
 	c.WriteLen(len(res))
 	for _, e := range res {
@@ -1528,7 +1532,7 @@ func xautoclaim(
 		return nextCallId, nil
 	}
 
-	msgs := g.pendingAfter(start)
+	msgs := g.pendingAfterOrEqual(start)
 	var res []StreamEntry
 	for i, p := range msgs {
 		if minIdleTime > 0 && now.Before(p.lastDelivery.Add(minIdleTime)) {

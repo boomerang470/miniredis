@@ -1,6 +1,36 @@
 ## Changelog
 
 
+## v2.35.0
+
+- add Lua redis.setresp({2,3})
+- embed gopher-json package
+- fix XAUTOCLAIM (thanks @kgunning)
+- fix writeXpending (thanks @gnpaone)
+- fix BLMOVE TTL special case
+- constants for key types @alyssaruth
+
+
+### v2.34.0
+
+- fix ZINTERSTORE where target is one of the source sets
+- added support for ZRank and ZRevRank with score (thanks Jeff Howell)
+- fix MEMORY subcommand casing (thanks @joshaber)
+- use streamCmp in Xtrim (thanks @daniel-cohere)
+
+
+### v2.33.0
+
+- minimum Go version is now 1.17
+- fix integer overflow (thanks @wszaranski)
+- test against the last BSD redis (7.2.4)
+- ignore 'redis.set_repl()' call (thanks @TingluoHuang)
+- various build fixes (thanks @wszaranski)
+- add StartAddrTLS function (thanks @agriffaut)
+- support for the NOMKSTREAM option for XADD (thanks @Jahaja)
+- return empty array for SRANDMEMBER on nonexistent key (thanks @WKBae)
+
+
 ### v2.32.1
 
 - support for SINTERCARD (thanks @s-barr-fetch)

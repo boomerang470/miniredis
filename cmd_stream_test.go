@@ -187,6 +187,21 @@ func TestStreamAdd(t *testing.T) {
 		)
 	})
 
+	t.Run("XADD NOMKSTREAM", func(t *testing.T) {
+		mustDo(t, c,
+			"XADD", "reallynosuchkey", "NOMKSTREAM", "*", "one", "1",
+			proto.Nil,
+		)
+		mustDo(t, c,
+			"XADD", "reallynosuchkey", "NOMKSTREAM", "MINID", "1672545848004-0", "*", "one", "1",
+			proto.Nil,
+		)
+		mustDo(t, c,
+			"XADD", "reallynosuchkey", "NOMKSTREAM", "MAXLEN", "~", "10", "*", "one", "1",
+			proto.Nil,
+		)
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		// Wrong type of key
 		mustOK(t, c,
@@ -951,7 +966,7 @@ func TestStreamXpending(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "-99",
-			proto.NilList,
+			proto.Array(),
 		)
 
 		// Increase delivery count
@@ -977,11 +992,11 @@ func TestStreamXpending(t *testing.T) {
 
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "IDLE", "5000", "-", "+", "999",
-			proto.NilList,
+			proto.Array(),
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "999", "bob",
-			proto.NilList,
+			proto.Array(),
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "IDLE", "4000", "-", "+", "999", "alice",
@@ -1001,7 +1016,7 @@ func TestStreamXpending(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "999",
-			proto.NilList,
+			proto.Array(),
 		)
 	})
 
@@ -1061,9 +1076,13 @@ func TestStreamTrim(t *testing.T) {
 	ok(t, err)
 	_, err = c.Do("XADD", "planets", "5-1", "name", "Saturn")
 	ok(t, err)
+	_, err = c.Do("XADD", "planets", "5-2", "name", "Uranus")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "5-11", "name", "Pluto")
+	ok(t, err)
 
 	mustDo(t, c,
-		"XTRIM", "planets", "MAXLEN", "=", "3", proto.Int(3))
+		"XTRIM", "planets", "MAXLEN", "=", "5", proto.Int(3))
 
 	mustDo(t, c,
 		"XRANGE", "planets", "-", "+",
@@ -1071,6 +1090,8 @@ func TestStreamTrim(t *testing.T) {
 			proto.Array(proto.String("3-0"), proto.Strings("name", "Mars")),
 			proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter")),
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+			proto.Array(proto.String("5-2"), proto.Strings("name", "Uranus")),
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
 		))
 
 	mustDo(t, c,
@@ -1081,6 +1102,8 @@ func TestStreamTrim(t *testing.T) {
 		proto.Array(
 			proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter")),
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+			proto.Array(proto.String("5-2"), proto.Strings("name", "Uranus")),
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
 		))
 
 	mustDo(t, c,
@@ -1090,6 +1113,17 @@ func TestStreamTrim(t *testing.T) {
 		"XRANGE", "planets", "-", "+",
 		proto.Array(
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+			proto.Array(proto.String("5-2"), proto.Strings("name", "Uranus")),
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
+		))
+
+	mustDo(t, c,
+		"XTRIM", "planets", "MINID", "5-11", proto.Int(2))
+
+	mustDo(t, c,
+		"XRANGE", "planets", "-", "+",
+		proto.Array(
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
 		))
 }
 
@@ -1288,6 +1322,21 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(),
 		),
 	)
+
+	// read again using the ID returned from the last XAUTOCLAIM call as 'start'.
+	// the results include that starting message. unlike XREADGROUP, the results of XAUTOCLAIM
+	// are INCLUSIVE of the start ID.
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "bob", "15000", "0-2", "COUNT", "1",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(
+				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+			),
+			proto.Array(),
+		),
+	)
+
 	mustDo(t, c,
 		"XINFO", "CONSUMERS", "planets", "processing",
 		proto.Array(
@@ -1316,8 +1365,8 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("0-2"),
 				proto.String("bob"),
-				proto.Int(20000),
-				proto.Int(4),
+				proto.Int(0),
+				proto.Int(5),
 			),
 		),
 	)
@@ -1395,7 +1444,7 @@ func TestStreamClaim(t *testing.T) {
 	)
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
-		proto.NilList,
+		proto.Array(),
 	)
 
 	mustDo(t, c,
@@ -1654,6 +1703,6 @@ func TestStreamClaim(t *testing.T) {
 	)
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
-		proto.NilList,
+		proto.Array(),
 	)
 }
